@@ -168,7 +168,9 @@ pub fn ccuser<'a>(
                     })
                     .collect();
                 let value = values.join("\n");
-                embed.field(key, value, false);
+                if values.len() > 0 {
+                    embed.field(key, value, false);
+                }
                 embed.footer(|footer| {
                     footer.text("Classes or locations common to you are underlined.")
                 });
