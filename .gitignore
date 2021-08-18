@@ -1,3 +1,4 @@
 /target
 courses.json
 user.db/
+.DS_Store
