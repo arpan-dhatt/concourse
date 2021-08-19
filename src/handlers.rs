@@ -254,9 +254,8 @@ pub fn cclookup<'a>(
                     ),
                     match users_here.len() > 0 {
                         true => users_here.join(""),
-                        false => "No students found".to_string()
-                    }
-                    ,
+                        false => "No students found".to_string(),
+                    },
                     false,
                 );
             }
@@ -285,12 +284,26 @@ pub fn ccdelete<'a>(
     }
 }
 
+pub fn cchelp<'a>(
+    embed: &'a mut CreateEmbed,
+    _command: &ApplicationCommandInteraction,
+) -> &'a mut CreateEmbed {
+    embed
+        .title("Concourse Help Page")
+        .color(Color::from_rgb(0,255,0))
+        .description("Concourse is a bot built for UT that is meant to replace sending pictures of your schedule. It allows you to input your unique course codes and compare them to other students. You can also lookup unique course codes to see who is in the classes. This bot can show if you have lectures with other students, even if unique course codes are different (multiple unique codes usually share lectures).\nCommands:")
+        .field("`/ccupdate`", "Get started by using this command. Use comma-separated course codes, like this `/ccupdate codes:12349,56789,98765`.", false)
+        .field("`/ccuser`", "If this user has entered their courses already, you can see them and the times/locations, if available for the course. If you've entered your courses already using `/ccupdate` it will underline similarities.", false)
+        .field("`/cclookup`", "Lookup a certain class code to see if anyone is taking it (async classes won't show people for now). This will list the course's times and if anyone who has entered the codes they will be listed.", false)
+        .field("`/ccdelete`", "Deletes your course codes from the bot's database, in case you don't want them there at any point.", false)
+}
+
 pub fn unknown_command<'a>(
     embed: &'a mut CreateEmbed,
     _command: &ApplicationCommandInteraction,
 ) -> &'a mut CreateEmbed {
     embed
         .title("Incorrect Command Usage")
-        .description("Use one of 4 commands: `ccupdate`, `ccuser`, `cclookup`, `ccdelete`, and make sure your input values are valid.")
+        .description("Use one of 5 commands: `ccupdate`, `ccuser`, `cclookup`, `ccdelete`, `cchelp`, and make sure your input values are valid.")
         .color(Color::from_rgb(255, 0, 0))
 }

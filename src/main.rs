@@ -34,6 +34,7 @@ impl EventHandler for Handler {
                                     "ccuser" => handlers::ccuser(embed, &command),
                                     "cclookup" => handlers::cclookup(embed, &command),
                                     "ccdelete" => handlers::ccdelete(embed, &command),
+                                    "cchelp" => handlers::cchelp(embed, &command),
                                     _ => handlers::unknown_command(embed, &command)
                                 }
                             })
@@ -91,6 +92,11 @@ impl EventHandler for Handler {
                     command
                         .name("ccdelete")
                         .description("Delete your course information")
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("cchelp")
+                        .description("Learn about the bot and its commands")
                 })
         })
         .await;
