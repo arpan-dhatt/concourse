@@ -23,7 +23,9 @@ struct Handler;
 impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
-            if let Err(why) = command
+            if let Err(why) = match command.data.name.as_str() {
+                "ccfind" => handlers::ccfind(command, ctx).await,
+                _ => command
                 .create_interaction_response(&ctx.http, |response| {
                     response
                         .kind(InteractionResponseType::ChannelMessageWithSource)
@@ -41,6 +43,7 @@ impl EventHandler for Handler {
                         })
                 })
                 .await
+            }
             {
                 println!("Cannot respond to slash command: {}", why);
             }
@@ -87,6 +90,11 @@ impl EventHandler for Handler {
                                 .kind(ApplicationCommandOptionType::Integer)
                                 .required(true)
                         })
+                })
+                .create_application_command(|command| {
+                    command
+                        .name("ccfind")
+                        .description("Find at students in all your classes")
                 })
                 .create_application_command(|command| {
                     command

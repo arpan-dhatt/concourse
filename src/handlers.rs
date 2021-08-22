@@ -5,6 +5,7 @@ use lazy_static::lazy_static;
 use serde::Deserialize;
 use serenity::{
     builder::CreateEmbed,
+    client::Context,
     model::interactions::application_command::{
         ApplicationCommandInteraction, ApplicationCommandInteractionDataOptionValue,
     },
@@ -265,6 +266,77 @@ pub fn cclookup<'a>(
     unknown_command(embed, command)
 }
 
+pub async fn ccfind(command: ApplicationCommandInteraction, ctx: Context) -> serenity::Result<()> {
+    command
+        .create_interaction_response(ctx.http, |response| {
+            response
+                .kind(serenity::model::interactions::InteractionResponseType::ChannelMessageWithSource)
+                .interaction_response_data(|message| {
+                    if let Ok(Some(courses_bytes)) = USERDB.get(command.user.id.as_u64().to_be_bytes()) {
+                        let courses: Vec<i64> = serde_json::from_slice(&courses_bytes).unwrap_or(vec![]);
+                        if courses.len() == 0 {
+                            message.create_embed(|embed| {
+                                embed.title("Insufficient Information")
+                                    .description("Make sure you've entered your data into the system. Otherwise this command does not work. Check `/cchelp` for more information.")
+                                    .color(Color::from_rgb(255, 0, 0))
+                            })
+                        }
+                        else {
+                            for code in courses {
+                                message.create_embed(|embed| {
+                                    if let Some(course) = COURSEDATA.get(&code) {
+                                        embed
+                                            .title(course.code)
+                                            .description(format!(
+                                                "{}",
+                                                course
+                                                    .name
+                                                    .as_ref()
+                                                    .unwrap_or(&String::from("Unknown Name"))
+                                            ))
+                                            .color(Color::from_rgb(0, 255, 0));
+                                        for time in &course.times {
+                                            let users_here: Vec<String> = get_users_in_location(time)
+                                                .iter()
+                                                .map(|c| format!("<@{}>", c))
+                                                .collect();
+                                            embed.field(
+                                                format!(
+                                                    "{} | {}-{} | {}",
+                                                    time.day.as_ref().unwrap_or(&String::from("-")),
+                                                    time.time.0.format("%I:%M %p"),
+                                                    time.time.1.format("%I:%M %p"),
+                                                    time.location.as_ref().unwrap_or(&String::from("-"))
+                                                ),
+                                                match users_here.len() > 0 {
+                                                    true => users_here.join(""),
+                                                    false => "No students found".to_string(),
+                                                },
+                                                false,
+                                            );
+                                        }
+                                        embed
+                                        } else {
+                                            embed.title(code)
+                                                .description("This code is not found in the database. Make sure it's a valid unique class code. If it is, then report this to the developer. (check bot's about).")
+                                        }
+                                });
+                            }
+                            message
+                        }
+                    }
+                    else {
+                        message.create_embed(|embed| {
+                                embed.title("Insufficient Information")
+                                    .description("Make sure you've entered your data into the system. Otherwise this command does not work. Check `/cchelp` for more information.")
+                                    .color(Color::from_rgb(255, 0, 0))
+                            })
+                    }
+                })
+        })
+        .await
+}
+
 pub fn ccdelete<'a>(
     embed: &'a mut CreateEmbed,
     command: &ApplicationCommandInteraction,
@@ -294,6 +366,7 @@ pub fn cchelp<'a>(
         .description("Concourse is a bot built for UT that is meant to replace sending pictures of your schedule. It allows you to input your unique course codes and compare them to other students. You can also lookup unique course codes to see who is in the classes. This bot can show if you have lectures with other students, even if unique course codes are different (multiple unique codes usually share lectures).\nCommands:")
         .field("`/ccupdate`", "Get started by using this command. Use comma-separated course codes, like this `/ccupdate codes:12349,56789,98765`.", false)
         .field("`/ccuser`", "If this user has entered their courses already, you can see them and the times/locations, if available for the course. If you've entered your courses already using `/ccupdate` it will underline similarities.", false)
+        .field("`/ccfind`", "Lists all your classes you're attending by their location, and every student in that class.", false)
         .field("`/cclookup`", "Lookup a certain class code to see if anyone is taking it (async classes won't show people for now). This will list the course's times and if anyone who has entered the codes they will be listed.", false)
         .field("`/ccdelete`", "Deletes your course codes from the bot's database, in case you don't want them there at any point.", false)
 }
@@ -304,6 +377,6 @@ pub fn unknown_command<'a>(
 ) -> &'a mut CreateEmbed {
     embed
         .title("Incorrect Command Usage")
-        .description("Use one of 5 commands: `ccupdate`, `ccuser`, `cclookup`, `ccdelete`, `cchelp`, and make sure your input values are valid.")
+        .description("Use one of 5 commands: `ccupdate`, `ccuser`, `cclookup`, `ccfind`, `ccdelete`, `cchelp`, and make sure your input values are valid.")
         .color(Color::from_rgb(255, 0, 0))
 }
