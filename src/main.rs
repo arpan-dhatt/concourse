@@ -7,10 +7,7 @@ use serenity::{
     model::{
         gateway::Ready,
         interactions::{
-            application_command::{
-                ApplicationCommand,
-                ApplicationCommandOptionType,
-            },
+            application_command::{ApplicationCommand, ApplicationCommandOptionType},
             Interaction, InteractionResponseType,
         },
     },
@@ -25,26 +22,25 @@ impl EventHandler for Handler {
         if let Interaction::ApplicationCommand(command) = interaction {
             if let Err(why) = match command.data.name.as_str() {
                 "ccfind" => handlers::ccfind(command, ctx).await,
-                _ => command
-                .create_interaction_response(&ctx.http, |response| {
-                    response
-                        .kind(InteractionResponseType::ChannelMessageWithSource)
-                        .interaction_response_data(|message| {
-                            message.create_embed(|embed| {
-                                match command.data.name.as_str() {
-                                    "ccupdate" => handlers::ccupdate(embed, &command),
-                                    "ccuser" => handlers::ccuser(embed, &command),
-                                    "cclookup" => handlers::cclookup(embed, &command),
-                                    "ccdelete" => handlers::ccdelete(embed, &command),
-                                    "cchelp" => handlers::cchelp(embed, &command),
-                                    _ => handlers::unknown_command(embed, &command)
-                                }
-                            })
+                _ => {
+                    command
+                        .create_interaction_response(&ctx.http, |response| {
+                            response
+                                .kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|message| {
+                                    message.create_embed(|embed| match command.data.name.as_str() {
+                                        "ccupdate" => handlers::ccupdate(embed, &command),
+                                        "ccuser" => handlers::ccuser(embed, &command),
+                                        "cclookup" => handlers::cclookup(embed, &command),
+                                        "ccdelete" => handlers::ccdelete(embed, &command),
+                                        "cchelp" => handlers::cchelp(embed, &command),
+                                        _ => handlers::unknown_command(embed, &command),
+                                    })
+                                })
                         })
-                })
-                .await
-            }
-            {
+                        .await
+                }
+            } {
                 println!("Cannot respond to slash command: {}", why);
             }
         }
