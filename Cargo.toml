@@ -1,2 +1,2 @@
 [workspace]
-members = ["./discord-bot", "./svg-schedule"]
+members = ["./concourse-discord-bot", "./svg-schedule"]
