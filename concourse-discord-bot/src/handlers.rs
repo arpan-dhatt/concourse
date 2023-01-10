@@ -1,4 +1,7 @@
-use std::{collections::HashMap, io::Read};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Read,
+};
 
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
@@ -6,8 +9,11 @@ use serde::Deserialize;
 use serenity::{
     builder::CreateEmbed,
     client::Context,
-    model::interactions::application_command::{
-        ApplicationCommandInteraction, ApplicationCommandInteractionDataOptionValue,
+    model::{
+        interactions::application_command::{
+            ApplicationCommandInteraction, ApplicationCommandInteractionDataOptionValue,
+        },
+        prelude::RoleId,
     },
     utils::Color,
 };
@@ -37,6 +43,11 @@ struct Courses {
     courses: Vec<CourseData>,
 }
 
+#[derive(Deserialize)]
+struct ServerRoles {
+    servers: HashMap<u64, HashMap<String, u64>>,
+}
+
 lazy_static! {
     static ref USERDB: sled::Db =
         { sled::open(std::env::var("USERDB").unwrap_or("./user.db".to_string())).unwrap() };
@@ -54,6 +65,16 @@ lazy_static! {
         }
         map
     };
+    static ref ROLEMAPPING: ServerRoles = {
+        let mappings: ServerRoles = serde_json::from_slice(
+            &std::fs::read(std::env::var("ROLEMAPPING").unwrap_or("./roles.json".to_string()))
+                .unwrap(),
+        )
+        .unwrap();
+        mappings
+    };
+}
+
 fn is_private(uid: u64) -> bool {
     match PRIVACYDB.get(uid.to_be_bytes()) {
         Ok(Some(ivec)) => String::from_utf8(ivec.to_vec()).unwrap().parse().unwrap(),
@@ -386,6 +407,57 @@ pub fn ccprivacy<'a>(
     unknown_command(embed, command)
 }
 
+pub async fn ccrole<'a>(
+    mut command: ApplicationCommandInteraction,
+    ctx: Context,
+) -> serenity::Result<()> {
+    if let Ok(opt_courses_bytes) = USERDB.get(command.user.id.as_u64().to_be_bytes()) {
+        let courses_bytes = opt_courses_bytes
+            .map(|v| v.to_vec())
+            .unwrap_or(b"{}".to_vec());
+        let target_courses: Vec<i64> = serde_json::from_slice(&courses_bytes).unwrap_or(vec![]);
+        let target_courses: Vec<&CourseData> = target_courses
+            .iter()
+            .filter_map(|c| COURSEDATA.get(c))
+            .collect();
+        if let Some(guild_id) = command.guild_id {
+            let mem = command.member.as_mut().unwrap();
+            println!("{:?}", mem.roles);
+            if let Some(roles) = ROLEMAPPING.servers.get(guild_id.as_u64()) {
+                let intended: HashSet<RoleId> = target_courses
+                    .iter()
+                    .filter_map(|s| roles.get(s.name.as_ref().unwrap()))
+                    .map(|u| RoleId(*u))
+                    .collect();
+                let existing: HashSet<RoleId> = mem
+                    .roles
+                    .iter()
+                    .filter(|r| roles.values().any(|u| r.as_u64() == u))
+                    .cloned()
+                    .collect();
+                let to_remove: Vec<RoleId> = (&existing - &intended).into_iter().collect();
+                let to_add: Vec<RoleId> = intended.into_iter().collect();
+                println!("{to_remove:?}");
+                mem.remove_roles(ctx.http.clone(), &to_remove).await?;
+                mem.add_roles(ctx.http.clone(), &to_add).await.ok();
+            }
+        }
+    }
+    command
+        .create_interaction_response(ctx.http, |response| {
+            response
+            .kind(serenity::model::interactions::InteractionResponseType::ChannelMessageWithSource)
+            .interaction_response_data(|message| {
+                message.create_embed(|embed| {
+                    embed
+                        .title("Available Roles Added")
+                        .color((0, 255, 0))
+                })
+            })
+        })
+        .await
+}
+
 pub fn ccdelete<'a>(
     embed: &'a mut CreateEmbed,
     command: &ApplicationCommandInteraction,
@@ -417,6 +489,7 @@ pub fn cchelp<'a>(
         .field("`/ccuser`", "If this user has entered their courses already, you can see them and the times/locations, if available for the course. If you've entered your courses already using `/ccupdate` it will underline similarities.", false)
         .field("`/ccfind`", "Lists all your classes you're attending by their location, and every student in that class.", false)
         .field("`/cclookup`", "Lookup a certain class code to see if anyone is taking it (async classes won't show people for now). This will list the course's times and if anyone who has entered the codes they will be listed.", false)
+        .field("`/ccrole`", "Assign this server's supported roles based on the classes you're registered in", false)
         .field("`/ccprivacy`", "Adjust your privacy settings to hide or share your course data with other students", false)
         .field("`/ccdelete`", "Deletes your course codes from the bot's database, in case you don't want them there at any point.", false)
 }

@@ -22,6 +22,7 @@ impl EventHandler for Handler {
         if let Interaction::ApplicationCommand(command) = interaction {
             if let Err(why) = match command.data.name.as_str() {
                 "ccfind" => handlers::ccfind(command, ctx).await,
+                "ccrole" => handlers::ccrole(command, ctx).await,
                 _ => {
                     command
                         .create_interaction_response(&ctx.http, |response| {
@@ -100,6 +101,9 @@ impl EventHandler for Handler {
                 })
                 .create_application_command(|command| {
                     command
+                        .name("ccrole")
+                        .description("Assign roles based on your classes")
+                })
                 .create_application_command(|command| {
                     command
                         .name("ccprivacy")
