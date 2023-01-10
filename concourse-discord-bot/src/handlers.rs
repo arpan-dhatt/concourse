@@ -422,7 +422,6 @@ pub async fn ccrole<'a>(
             .collect();
         if let Some(guild_id) = command.guild_id {
             let mem = command.member.as_mut().unwrap();
-            println!("{:?}", mem.roles);
             if let Some(roles) = ROLEMAPPING.servers.get(guild_id.as_u64()) {
                 let intended: HashSet<RoleId> = target_courses
                     .iter()
@@ -437,7 +436,6 @@ pub async fn ccrole<'a>(
                     .collect();
                 let to_remove: Vec<RoleId> = (&existing - &intended).into_iter().collect();
                 let to_add: Vec<RoleId> = intended.into_iter().collect();
-                println!("{to_remove:?}");
                 mem.remove_roles(ctx.http.clone(), &to_remove).await?;
                 mem.add_roles(ctx.http.clone(), &to_add).await.ok();
             }
