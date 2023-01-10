@@ -34,6 +34,7 @@ impl EventHandler for Handler {
                                         "cclookup" => handlers::cclookup(embed, &command),
                                         "ccdelete" => handlers::ccdelete(embed, &command),
                                         "cchelp" => handlers::cchelp(embed, &command),
+                                        "ccprivacy" => handlers::ccprivacy(embed, &command),
                                         _ => handlers::unknown_command(embed, &command),
                                     })
                                 })
@@ -96,6 +97,20 @@ impl EventHandler for Handler {
                     command
                         .name("ccdelete")
                         .description("Delete your course information")
+                })
+                .create_application_command(|command| {
+                    command
+                .create_application_command(|command| {
+                    command
+                        .name("ccprivacy")
+                        .description("Make your course data private/public")
+                        .create_option(|option| {
+                            option
+                                .name("private")
+                                .description("Make course data private/public")
+                                .kind(ApplicationCommandOptionType::Boolean)
+                                .required(true)
+                        })
                 })
                 .create_application_command(|command| {
                     command

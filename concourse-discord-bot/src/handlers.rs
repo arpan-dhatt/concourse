@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Read};
 
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
@@ -40,6 +40,8 @@ struct Courses {
 lazy_static! {
     static ref USERDB: sled::Db =
         { sled::open(std::env::var("USERDB").unwrap_or("./user.db".to_string())).unwrap() };
+    static ref PRIVACYDB: sled::Db =
+        { sled::open(std::env::var("PRIVACYDB").unwrap_or("./privacy.db".to_string())).unwrap() };
     static ref COURSEDATA: HashMap<i64, CourseData> = {
         let courses: Courses = serde_json::from_slice(
             &std::fs::read(std::env::var("COURSEDATA").unwrap_or("./courses.json".to_string()))
@@ -52,6 +54,11 @@ lazy_static! {
         }
         map
     };
+fn is_private(uid: u64) -> bool {
+    match PRIVACYDB.get(uid.to_be_bytes()) {
+        Ok(Some(ivec)) => String::from_utf8(ivec.to_vec()).unwrap().parse().unwrap(),
+        _ => false,
+    }
 }
 
 pub fn ccupdate<'a>(
@@ -114,6 +121,14 @@ pub fn ccuser<'a>(
         }
     }
     if let ApplicationCommandInteractionDataOptionValue::User(user, Some(member)) = options {
+        if is_private(*user.id.as_u64()) && command.user.id != user.id {
+            // allow ccuser if issuer == target
+            embed
+                .title(member.nick.as_ref().unwrap_or(&user.name))
+                .description("This user's data is private.")
+                .color(Color::from_rgb(255, 85, 0));
+            return embed;
+        }
         if let Ok(Some(courses_bytes)) = USERDB.get(user.id.as_u64().to_be_bytes()) {
             let target_courses: Vec<i64> = serde_json::from_slice(&courses_bytes).unwrap_or(vec![]);
             let target_courses: Vec<&CourseData> = target_courses
@@ -198,6 +213,9 @@ fn get_users_in_location(course_time: &CourseTime) -> Vec<u64> {
             buf[i] = *(user_id_bytes.get(i).unwrap_or(&0));
         }
         let user_id = u64::from_be_bytes(buf);
+        if is_private(user_id) {
+            continue;
+        }
         let course_codes: Vec<i64> = serde_json::from_slice(&course_codes_bytes).unwrap_or(vec![]);
         let courses: Vec<&CourseData> = course_codes
             .iter()
@@ -337,6 +355,37 @@ pub async fn ccfind(command: ApplicationCommandInteraction, ctx: Context) -> ser
         .await
 }
 
+pub fn ccprivacy<'a>(
+    embed: &'a mut CreateEmbed,
+    command: &ApplicationCommandInteraction,
+) -> &'a mut CreateEmbed {
+    let options = command
+        .data
+        .options
+        .get(0)
+        .expect("Expected privacy option")
+        .resolved
+        .as_ref()
+        .expect("Expected boolean value");
+    if let ApplicationCommandInteractionDataOptionValue::Boolean(private) = options {
+        PRIVACYDB
+            .insert(
+                command.user.id.as_u64().to_be_bytes(),
+                private.to_string().as_bytes(),
+            )
+            .unwrap();
+        embed
+            .title("Success")
+            .description(&format!(
+                "Your course data is now {}",
+                if *private { "private" } else { "public" }
+            ))
+            .color(Color::from_rgb(0, 255, 0));
+        return embed;
+    }
+    unknown_command(embed, command)
+}
+
 pub fn ccdelete<'a>(
     embed: &'a mut CreateEmbed,
     command: &ApplicationCommandInteraction,
@@ -363,11 +412,12 @@ pub fn cchelp<'a>(
     embed
         .title("Concourse Help Page")
         .color(Color::from_rgb(0,255,0))
-        .description("Concourse is a bot built for UT that is meant to replace sending pictures of your schedule. It allows you to input your unique course codes and compare them to other students. You can also lookup unique course codes to see who is in the classes. This bot can show if you have lectures with other students, even if unique course codes are different (multiple unique codes usually share lectures).\nCommands:")
+        .description("Concourse is a bot built for UT that is meant to replace sending pictures of your schedule. It allows you to input your unique course codes and compare them to other students. You can also lookup unique course codes to see who is in the classes. This bot can show if you have lectures with other students, even if unique course codes are different (multiple unique codes usually share lectures).\nBy default your **course data is public to other students**. If you would like to hide it, use the `/ccprivacy`.\nCommands:")
         .field("`/ccupdate`", "Get started by using this command. Use comma-separated course codes, like this `/ccupdate codes:12349,56789,98765`.", false)
         .field("`/ccuser`", "If this user has entered their courses already, you can see them and the times/locations, if available for the course. If you've entered your courses already using `/ccupdate` it will underline similarities.", false)
         .field("`/ccfind`", "Lists all your classes you're attending by their location, and every student in that class.", false)
         .field("`/cclookup`", "Lookup a certain class code to see if anyone is taking it (async classes won't show people for now). This will list the course's times and if anyone who has entered the codes they will be listed.", false)
+        .field("`/ccprivacy`", "Adjust your privacy settings to hide or share your course data with other students", false)
         .field("`/ccdelete`", "Deletes your course codes from the bot's database, in case you don't want them there at any point.", false)
 }
 
