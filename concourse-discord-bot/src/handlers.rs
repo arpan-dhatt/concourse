@@ -411,6 +411,7 @@ pub async fn ccrole<'a>(
     mut command: ApplicationCommandInteraction,
     ctx: Context,
 ) -> serenity::Result<()> {
+    let mut adding_roles = vec![];
     if let Ok(opt_courses_bytes) = USERDB.get(command.user.id.as_u64().to_be_bytes()) {
         let courses_bytes = opt_courses_bytes
             .map(|v| v.to_vec())
@@ -436,11 +437,13 @@ pub async fn ccrole<'a>(
                     .collect();
                 let to_remove: Vec<RoleId> = (&existing - &intended).into_iter().collect();
                 let to_add: Vec<RoleId> = intended.into_iter().collect();
+                adding_roles = to_add.clone();
                 mem.remove_roles(ctx.http.clone(), &to_remove).await?;
                 mem.add_roles(ctx.http.clone(), &to_add).await.ok();
             }
         }
     }
+    let adding_roles: Vec<String> = adding_roles.into_iter().map(|r| format!("<@&{}>", *r.as_u64())).collect();
     command
         .create_interaction_response(ctx.http, |response| {
             response
@@ -449,6 +452,7 @@ pub async fn ccrole<'a>(
                 message.create_embed(|embed| {
                     embed
                         .title("Available Roles Added")
+                        .description(adding_roles.join(" "))
                         .color((0, 255, 0))
                 })
             })
