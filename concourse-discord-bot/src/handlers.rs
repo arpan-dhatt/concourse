@@ -19,14 +19,14 @@ use serenity::{
 };
 use sled;
 
-#[derive(Deserialize, PartialEq)]
+#[derive(Deserialize, PartialEq, Debug)]
 struct CourseTime {
     day: Option<String>,
     time: (DateTime<Utc>, DateTime<Utc>),
     location: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct CourseData {
     code: i64,
     link: Option<String>,
@@ -412,6 +412,7 @@ pub async fn ccrole<'a>(
     ctx: Context,
 ) -> serenity::Result<()> {
     let mut adding_roles = vec![];
+    let mut removing_roles = vec![];
     if let Ok(opt_courses_bytes) = USERDB.get(command.user.id.as_u64().to_be_bytes()) {
         let courses_bytes = opt_courses_bytes
             .map(|v| v.to_vec())
@@ -436,14 +437,16 @@ pub async fn ccrole<'a>(
                     .cloned()
                     .collect();
                 let to_remove: Vec<RoleId> = (&existing - &intended).into_iter().collect();
-                let to_add: Vec<RoleId> = intended.into_iter().collect();
+                let to_add: Vec<RoleId> = (&intended - &existing).into_iter().collect();
                 adding_roles = to_add.clone();
+                removing_roles = to_remove.clone();
                 mem.remove_roles(ctx.http.clone(), &to_remove).await?;
                 mem.add_roles(ctx.http.clone(), &to_add).await.ok();
             }
         }
     }
     let adding_roles: Vec<String> = adding_roles.into_iter().map(|r| format!("<@&{}>", *r.as_u64())).collect();
+    let removing_roles: Vec<String> = removing_roles.into_iter().map(|r| format!("<@&{}>", *r.as_u64())).collect();
     command
         .create_interaction_response(ctx.http, |response| {
             response
@@ -451,8 +454,9 @@ pub async fn ccrole<'a>(
             .interaction_response_data(|message| {
                 message.create_embed(|embed| {
                     embed
-                        .title("Available Roles Added")
-                        .description(adding_roles.join(" "))
+                        .title("Class Roles Changed")
+                        .field("Added", adding_roles.join(" "), false)
+                        .field("Removed", removing_roles.join(" "), false)
                         .color((0, 255, 0))
                 })
             })
