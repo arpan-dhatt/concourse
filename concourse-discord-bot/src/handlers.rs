@@ -218,7 +218,7 @@ pub fn ccuser<'a>(
         } else {
             embed
                 .title(member.nick.as_ref().unwrap_or(&user.name))
-                .description("No data available. This user doesn't have any course codes stored.")
+                .description(&format!("No data available. This user needs to use `/ccupdate` to enter their courses."))
                 .color(Color::from_rgb(255, 85, 0));
             return embed;
         }
@@ -453,11 +453,14 @@ pub async fn ccrole<'a>(
             .kind(serenity::model::interactions::InteractionResponseType::ChannelMessageWithSource)
             .interaction_response_data(|message| {
                 message.create_embed(|embed| {
-                    embed
-                        .title("Class Roles Changed")
-                        .field("Added", adding_roles.join(" "), false)
-                        .field("Removed", removing_roles.join(" "), false)
-                        .color((0, 255, 0))
+                    let mut embed = embed.title(if adding_roles.is_empty() && removing_roles.is_empty() { "No Roles Changed" } else { "Class Roles Changed" });
+                    if !adding_roles.is_empty() {
+                        embed = embed.field("Added", adding_roles.join(" "), false)
+                    }
+                    if !removing_roles.is_empty() {
+                        embed = embed.field("Removed", removing_roles.join(" "), false);
+                    }
+                    embed.color((0, 255, 0))
                 })
             })
         })
